@@ -662,7 +662,7 @@ submit_queue(void *data, void *gdata, int thread_index)
          submit++;
       }
    }
-   
+
    if (si[ZINK_SUBMIT_WAIT_ACQUIRE].waitSemaphoreCount != 0 &&
        si[ZINK_SUBMIT_WAIT_FD].waitSemaphoreCount == 0) {
       si[ZINK_SUBMIT_WAIT_FD] = si[ZINK_SUBMIT_WAIT_ACQUIRE];
@@ -746,8 +746,16 @@ submit_queue(void *data, void *gdata, int thread_index)
       );
    }
 
-   if (!si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount)
+   if (!si[ZINK_SUBMIT_CMDBUF].signalSemaphoreCount &&
+       screen->driver_workarounds.broken_submit) {
+      si[ZINK_SUBMIT_CMDBUF].signalSemaphoreCount = si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount;
+      si[ZINK_SUBMIT_CMDBUF].pSignalSemaphores = si[ZINK_SUBMIT_SIGNAL].pSignalSemaphores;
+      si[ZINK_SUBMIT_CMDBUF].pNext = si[ZINK_SUBMIT_SIGNAL].pNext;
       num_si--;
+   } else if (!si[ZINK_SUBMIT_SIGNAL].signalSemaphoreCount) {
+      num_si--;
+   }
+
 
    simple_mtx_lock(&screen->queue_lock);
    VRAM_ALLOC_LOOP(result,

@@ -1564,6 +1564,7 @@ struct zink_screen {
       bool can_do_invalid_linear_modifier;
       bool broken_const;
       bool broken_demote;
+      bool broken_submit;
       unsigned z16_unscaled_bias;
       unsigned z24_unscaled_bias;
    } driver_workarounds;
