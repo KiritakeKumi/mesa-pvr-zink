@@ -1563,6 +1563,7 @@ struct zink_screen {
       bool needs_zs_shader_swizzle;
       bool can_do_invalid_linear_modifier;
       bool broken_const;
+      bool broken_demote;
       unsigned z16_unscaled_bias;
       unsigned z24_unscaled_bias;
    } driver_workarounds;
