@@ -662,6 +662,13 @@ submit_queue(void *data, void *gdata, int thread_index)
          submit++;
       }
    }
+   
+   if (si[ZINK_SUBMIT_WAIT_ACQUIRE].waitSemaphoreCount != 0 &&
+       si[ZINK_SUBMIT_WAIT_FD].waitSemaphoreCount == 0) {
+      si[ZINK_SUBMIT_WAIT_FD] = si[ZINK_SUBMIT_WAIT_ACQUIRE];
+      num_si--;
+      submit++;
+   }
 
    /* then the real submit */
    si[ZINK_SUBMIT_CMDBUF].waitSemaphoreCount = util_dynarray_num_elements(&bs->wait_semaphores, VkSemaphore);
