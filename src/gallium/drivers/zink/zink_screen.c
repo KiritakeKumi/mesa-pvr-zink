@@ -2781,7 +2781,7 @@ init_driver_workarounds(struct zink_screen *screen)
       screen->driver_workarounds.no_linesmooth = true;
 
    /* Assume Rogue when no geometryShader is available */
-   if (zink_driverid(screen) ==
+   if (screen->info.driver_props.driverID ==
        VK_DRIVER_ID_IMAGINATION_PROPRIETARY &&
        !screen->info.feats.features.geometryShader)
       screen->driver_workarounds.broken_submit = true;
@@ -2864,7 +2864,7 @@ init_driver_workarounds(struct zink_screen *screen)
    }
 
    /* these drivers cannot handle arbitary const value types */
-   switch (zink_driverid(screen)) {
+   switch (screen->info.driver_props.driverID) {
    case VK_DRIVER_ID_IMAGINATION_PROPRIETARY:
       screen->driver_compiler_workarounds.broken_const = true;
       break;
@@ -2874,7 +2874,7 @@ init_driver_workarounds(struct zink_screen *screen)
    }
 
    /* these drivers do not implement demote properly */
-   switch (zink_driverid(screen)) {
+   switch (screen->info.driver_props.driverID) {
    case VK_DRIVER_ID_IMAGINATION_PROPRIETARY:
       screen->driver_compiler_workarounds.broken_demote = true;
       break;

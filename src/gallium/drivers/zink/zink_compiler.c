@@ -5474,12 +5474,12 @@ zink_shader_create(struct zink_screen *screen, struct nir_shader *nir)
    NIR_PASS_V(nir, nir_lower_frexp); /* TODO: Use the spirv instructions for this. */
 
    if (screen->info.have_EXT_shader_demote_to_helper_invocation &&
-       !screen->driver_compiler_workarounds.broken_demote)
+       !screen->driver_compiler_workarounds.broken_demote){
       NIR_PASS_V(nir, nir_lower_discard_or_demote,
                  screen->driconf.glsl_correct_derivatives_after_discard ||
                  nir->info.use_legacy_math_rules);
    }
-
+   
    if (screen->need_2D_zs)
       NIR_PASS_V(nir, lower_1d_shadow, screen);
 

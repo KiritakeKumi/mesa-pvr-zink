@@ -1544,6 +1544,15 @@ struct zink_screen {
    VkPipelineLayout gfx_push_constant_layout;
 
    struct {
+      /* these affect shader cache */
+      bool lower_robustImageAccess2;
+      bool needs_zs_shader_swizzle;
+      bool needs_sanitised_layer;
+      bool io_opt;
+      bool broken_const;
+      bool broken_demote;
+   } driver_compiler_workarounds;
+   struct {
       bool broken_l4a4;
       /* https://gitlab.khronos.org/vulkan/vulkan/-/issues/3306
        * HI TURNIP
@@ -1562,8 +1571,6 @@ struct zink_screen {
       bool lower_robustImageAccess2;
       bool needs_zs_shader_swizzle;
       bool can_do_invalid_linear_modifier;
-      bool broken_const;
-      bool broken_demote;
       bool broken_submit;
       unsigned z16_unscaled_bias;
       unsigned z24_unscaled_bias;
