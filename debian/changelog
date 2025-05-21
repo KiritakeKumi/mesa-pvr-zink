@@ -1,3 +1,9 @@
+mesa (1:24.0.9+1rockos1+0pvr1) unstable; urgency=medium
+
+  * update img-mesa 24.0.9
+
+ -- nico <root@niconiconi.us>  Wed, 21 May 2025 00:00:00 +0800
+
 mesa (1:24.0.1+1rockos1+0pvr1) unstable; urgency=medium
 
   * Add pvr patch (ddk 24.2 - mesa24.0.1)
