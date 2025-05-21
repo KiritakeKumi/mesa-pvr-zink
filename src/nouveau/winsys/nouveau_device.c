@@ -351,6 +351,7 @@ nouveau_ws_device_new(drmDevicePtr drm_device)
 out_err:
    if (device->has_vm_bind) {
       util_vma_heap_finish(&device->vma_heap);
+      util_vma_heap_finish(&device->bda_heap);
       simple_mtx_destroy(&device->vma_mutex);
    }
    if (ver)
@@ -372,9 +373,20 @@ nouveau_ws_device_destroy(struct nouveau_ws_device *device)
 
    if (device->has_vm_bind) {
       util_vma_heap_finish(&device->vma_heap);
+      util_vma_heap_finish(&device->bda_heap);
       simple_mtx_destroy(&device->vma_mutex);
    }
 
    close(device->fd);
    FREE(device);
+}
+
+bool
+nouveau_ws_device_has_tiled_bo(struct nouveau_ws_device *device)
+{
+   uint64_t has = 0;
+   if (nouveau_ws_param(device->fd, NOUVEAU_GETPARAM_HAS_VMA_TILEMODE, &has))
+      return false;
+
+   return has != 0;
 }

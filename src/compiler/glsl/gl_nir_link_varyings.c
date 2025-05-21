@@ -50,6 +50,7 @@
 /* Temporary storage for the set of attributes that need locations assigned. */
 struct temp_attr {
    unsigned slots;
+   unsigned original_idx;
    nir_variable *var;
 };
 
@@ -61,7 +62,10 @@ compare_attr(const void *a, const void *b)
    const struct temp_attr *const r = (const struct temp_attr *) b;
 
    /* Reversed because we want a descending order sort below. */
-   return r->slots - l->slots;
+   if (r->slots != l->slots)
+      return r->slots - l->slots;
+
+   return l->original_idx - r->original_idx;
 }
 
 /**
@@ -1238,6 +1242,7 @@ assign_attribute_or_color_locations(void *mem_ctx,
       }
       to_assign[num_attr].slots = slots;
       to_assign[num_attr].var = var;
+      to_assign[num_attr].original_idx = num_attr;
       num_attr++;
    }
 
@@ -2315,9 +2320,17 @@ static int
 varying_matches_xfb_comparator(const void *x_generic, const void *y_generic)
 {
    const struct match *x = (const struct match *) x_generic;
-
-   if (x->producer_var != NULL && x->producer_var->data.is_xfb_only)
-      return varying_matches_match_comparator(x_generic, y_generic);
+   const struct match *y = (const struct match *) y_generic;
+   /* if both varying are used by transform feedback, sort them */
+   if (x->producer_var != NULL && x->producer_var->data.is_xfb_only) {
+      if (y->producer_var != NULL && y->producer_var->data.is_xfb_only)
+         return 0;
+      /* if x is varying and y is not, put y first */
+      return +1;
+   } else if (y->producer_var != NULL && y->producer_var->data.is_xfb_only) {
+      /* if y is varying and x is not, leave x first */
+      return -1;
+   }
 
    /* FIXME: When the comparator returns 0 it means the elements being
     * compared are equivalent. However the qsort documentation says:
@@ -2340,8 +2353,11 @@ static int
 varying_matches_not_xfb_comparator(const void *x_generic, const void *y_generic)
 {
    const struct match *x = (const struct match *) x_generic;
+   const struct match *y = (const struct match *) y_generic;
 
-   if (x->producer_var != NULL && !x->producer_var->data.is_xfb)
+   if ( (x->producer_var != NULL && !x->producer_var->data.is_xfb)
+        && (y->producer_var != NULL && !y->producer_var->data.is_xfb) )
+      /* if both are non-xfb, then sort them */
       return varying_matches_match_comparator(x_generic, y_generic);
 
    /* FIXME: When the comparator returns 0 it means the elements being

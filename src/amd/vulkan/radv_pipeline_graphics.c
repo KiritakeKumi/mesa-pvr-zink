@@ -1178,11 +1178,12 @@ get_vs_output_info(const struct radv_graphics_pipeline *pipeline)
 static bool
 radv_should_export_multiview(const struct radv_shader_stage *stage, const struct radv_pipeline_key *pipeline_key)
 {
-   /* Export the layer in the last VGT stage if multiview is used. When the next stage is unknown
-    * (with graphics pipeline library), the layer is exported unconditionally.
+   /* Export the layer in the last VGT stage if multiview is used.
+    * Also checks for NONE stage, which happens when we have depth-only rendering.
+    * When the next stage is unknown (with graphics pipeline library), the layer is exported unconditionally.
     */
    return pipeline_key->has_multiview_view_index &&
-          (stage->info.next_stage == MESA_SHADER_FRAGMENT ||
+          (stage->info.next_stage == MESA_SHADER_FRAGMENT || stage->info.next_stage == MESA_SHADER_NONE ||
            !(pipeline_key->lib_flags & VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT)) &&
           !(stage->nir->info.outputs_written & VARYING_BIT_LAYER);
 }
@@ -2596,7 +2597,7 @@ radv_graphics_pipeline_compile(struct radv_graphics_pipeline *pipeline, const Vk
    unsigned char hash[20];
    bool keep_executable_info = radv_pipeline_capture_shaders(device, pipeline->base.create_flags);
    bool keep_statistic_info = radv_pipeline_capture_shader_stats(device, pipeline->base.create_flags);
-   struct radv_shader_stage stages[MESA_VULKAN_SHADER_STAGES];
+   struct radv_shader_stage *stages = malloc(sizeof(struct radv_shader_stage) * MESA_VULKAN_SHADER_STAGES);
    const VkPipelineCreationFeedbackCreateInfo *creation_feedback =
       vk_find_struct_const(pCreateInfo->pNext, PIPELINE_CREATION_FEEDBACK_CREATE_INFO);
    VkPipelineCreationFeedback pipeline_feedback = {
@@ -2607,6 +2608,9 @@ radv_graphics_pipeline_compile(struct radv_graphics_pipeline *pipeline, const Vk
    const bool retain_shaders =
       !!(pipeline->base.create_flags & VK_PIPELINE_CREATE_2_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT);
    struct radv_retained_shaders *retained_shaders = NULL;
+
+   if (!stages)
+      return VK_ERROR_OUT_OF_HOST_MEMORY;
 
    int64_t pipeline_start = os_time_get_nano();
 
@@ -2668,8 +2672,10 @@ radv_graphics_pipeline_compile(struct radv_graphics_pipeline *pipeline, const Vk
 
          gfx_pipeline_lib->stages = radv_copy_shader_stage_create_info(device, pCreateInfo->stageCount,
                                                                        pCreateInfo->pStages, gfx_pipeline_lib->mem_ctx);
-         if (!gfx_pipeline_lib->stages)
+         if (!gfx_pipeline_lib->stages) {
+            free(stages);
             return VK_ERROR_OUT_OF_HOST_MEMORY;
+         }
 
          gfx_pipeline_lib->stage_count = pCreateInfo->stageCount;
       }
@@ -2678,8 +2684,10 @@ radv_graphics_pipeline_compile(struct radv_graphics_pipeline *pipeline, const Vk
       goto done;
    }
 
-   if (pipeline->base.create_flags & VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_KHR)
+   if (pipeline->base.create_flags & VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_KHR) {
+      free(stages);
       return VK_PIPELINE_COMPILE_REQUIRED;
+   }
 
    if (retain_shaders) {
       struct radv_graphics_lib_pipeline *gfx_pipeline_lib = radv_pipeline_to_graphics_lib(&pipeline->base);
@@ -2747,6 +2755,7 @@ done:
       }
    }
 
+   free(stages);
    return result;
 }
 

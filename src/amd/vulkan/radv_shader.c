@@ -982,6 +982,7 @@ alloc_block_obj(struct radv_device *device)
 static void
 free_block_obj(struct radv_device *device, union radv_shader_arena_block *block)
 {
+   list_del(&block->pool);
    list_add(&block->pool, &device->shader_block_obj_pool);
 }
 
@@ -1267,7 +1268,6 @@ radv_free_shader_memory(struct radv_device *device, union radv_shader_arena_bloc
          remove_hole(free_list, hole_prev);
 
       hole_prev->size += hole->size;
-      list_del(&hole->list);
       free_block_obj(device, hole);
 
       hole = hole_prev;
@@ -1280,7 +1280,6 @@ radv_free_shader_memory(struct radv_device *device, union radv_shader_arena_bloc
 
       hole_next->offset -= hole->size;
       hole_next->size += hole->size;
-      list_del(&hole->list);
       free_block_obj(device, hole);
 
       hole = hole_next;
@@ -1293,24 +1292,24 @@ radv_free_shader_memory(struct radv_device *device, union radv_shader_arena_bloc
       radv_rmv_log_bo_destroy(device, arena->bo);
       device->ws->buffer_destroy(device->ws, arena->bo);
       list_del(&arena->list);
+
+      if (device->capture_replay_arena_vas) {
+         struct hash_entry *arena_entry = NULL;
+         hash_table_foreach (device->capture_replay_arena_vas->table, entry) {
+            if (entry->data == arena) {
+               arena_entry = entry;
+               break;
+            }
+         }
+         _mesa_hash_table_remove(device->capture_replay_arena_vas->table, arena_entry);
+      }
+
       free(arena);
    } else if (free_list) {
       add_hole(free_list, hole);
    }
 
    mtx_unlock(&device->shader_arena_mutex);
-}
-
-struct radv_serialized_shader_arena_block
-radv_serialize_shader_arena_block(union radv_shader_arena_block *block)
-{
-   struct radv_serialized_shader_arena_block serialized_block = {
-      .offset = block->offset,
-      .size = block->size,
-      .arena_va = block->arena->bo->va,
-      .arena_size = block->arena->size,
-   };
-   return serialized_block;
 }
 
 union radv_shader_arena_block *
@@ -1571,7 +1570,7 @@ radv_postprocess_binary_config(struct radv_device *device, struct radv_shader_bi
    const struct radv_shader_info *info = &binary->info;
    gl_shader_stage stage = binary->info.stage;
    const struct radv_physical_device *pdevice = device->physical_device;
-   bool scratch_enabled = config->scratch_bytes_per_wave > 0 || info->cs.is_rt_shader;
+   bool scratch_enabled = config->scratch_bytes_per_wave > 0;
    bool trap_enabled = !!device->trap_handler_shader;
    unsigned vgpr_comp_cnt = 0;
    unsigned num_input_vgprs = args->ac.num_vgprs_used;
@@ -1717,8 +1716,6 @@ radv_postprocess_binary_config(struct radv_device *device, struct radv_shader_bi
    case MESA_SHADER_CALLABLE:
    case MESA_SHADER_INTERSECTION:
    case MESA_SHADER_ANY_HIT:
-      config->rsrc2 |= S_00B12C_SCRATCH_EN(1);
-      FALLTHROUGH;
    case MESA_SHADER_COMPUTE:
    case MESA_SHADER_TASK:
       config->rsrc1 |= S_00B848_MEM_ORDERED(pdevice->rad_info.gfx_level >= GFX10) | S_00B848_WGP_MODE(wgp_mode);

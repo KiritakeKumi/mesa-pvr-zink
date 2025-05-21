@@ -309,6 +309,11 @@ zink_batch_state_destroy(struct zink_screen *screen, struct zink_batch_state *bs
    util_dynarray_fini(&bs->bindless_releases[0]);
    util_dynarray_fini(&bs->bindless_releases[1]);
    util_dynarray_fini(&bs->acquires);
+   util_dynarray_fini(&bs->signal_semaphores);
+   util_dynarray_fini(&bs->wait_semaphores);
+   util_dynarray_fini(&bs->wait_semaphore_stages);
+   util_dynarray_fini(&bs->fd_wait_semaphores);
+   util_dynarray_fini(&bs->fd_wait_semaphore_stages);
    util_dynarray_fini(&bs->acquire_flags);
    unsigned num_mfences = util_dynarray_num_elements(&bs->fence.mfences, void *);
    struct zink_tc_fence **mfence = bs->fence.mfences.data;
@@ -458,10 +463,13 @@ get_batch_state(struct zink_context *ctx, struct zink_batch *batch)
       }
       simple_mtx_unlock(&screen->free_batch_states_lock);
    }
-   if (!bs && ctx->batch_states) {
-      /* states are stored sequentially, so if the first one doesn't work, none of them will */
-      if (zink_screen_check_last_finished(screen, ctx->batch_states->fence.batch_id) ||
-          find_unused_state(ctx->batch_states)) {
+   /* states are stored sequentially, so if the first one doesn't work, none of them will */
+   if (!bs && ctx->batch_states && ctx->batch_states->next) {
+      /* only a submitted state can be reused */
+      if (p_atomic_read(&ctx->batch_states->fence.submitted) &&
+          /* a submitted state must have completed before it can be reused */
+          (zink_screen_check_last_finished(screen, ctx->batch_states->fence.batch_id) ||
+           p_atomic_read(&ctx->batch_states->fence.completed))) {
          bs = ctx->batch_states;
          pop_batch_state(ctx);
       }
@@ -769,7 +777,7 @@ submit_queue(void *data, void *gdata, int thread_index)
 
    unsigned i = 0;
    VkSemaphore *sem = bs->signal_semaphores.data;
-   set_foreach_remove(&bs->dmabuf_exports, entry) {
+   set_foreach(&bs->dmabuf_exports, entry) {
       struct zink_resource *res = (void*)entry->key;
       for (; res; res = zink_resource(res->base.b.next))
          zink_screen_import_dmabuf_semaphore(screen, res, sem[i++]);
@@ -777,6 +785,7 @@ submit_queue(void *data, void *gdata, int thread_index)
       struct pipe_resource *pres = (void*)entry->key;
       pipe_resource_reference(&pres, NULL);
    }
+   _mesa_set_clear(&bs->dmabuf_exports, NULL);
 
    bs->usage.submit_count++;
 end:

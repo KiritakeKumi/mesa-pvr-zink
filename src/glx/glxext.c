@@ -908,13 +908,16 @@ __glXInitialize(Display * dpy)
 #endif /* HAVE_DRI3 */
       if (!debug_get_bool_option("LIBGL_DRI2_DISABLE", false))
          dpyPriv->dri2Display = dri2CreateDisplay(dpy);
+#if defined(HAVE_ZINK)
       if (!dpyPriv->dri3Display && !dpyPriv->dri2Display)
          try_zink = !debug_get_bool_option("LIBGL_KOPPER_DISABLE", false) &&
                     !getenv("GALLIUM_DRIVER");
+#endif /* HAVE_ZINK */
    }
 #endif /* GLX_USE_DRM */
    if (glx_direct)
-      dpyPriv->driswDisplay = driswCreateDisplay(dpy, zink | try_zink);
+      dpyPriv->driswDisplay = driswCreateDisplay(dpy, zink ? TRY_ZINK_YES :
+                                                             try_zink ? TRY_ZINK_INFER : TRY_ZINK_NO);
 
 #ifdef GLX_USE_WINDOWSGL
    if (glx_direct && glx_accel)
@@ -935,7 +938,7 @@ __glXInitialize(Display * dpy)
       if (try_zink) {
          free(dpyPriv->screens);
          dpyPriv->driswDisplay->destroyDisplay(dpyPriv->driswDisplay);
-         dpyPriv->driswDisplay = driswCreateDisplay(dpy, false);
+         dpyPriv->driswDisplay = driswCreateDisplay(dpy, TRY_ZINK_NO);
          fail = !AllocAndFetchScreenConfigs(dpy, dpyPriv, False);
       }
 #endif

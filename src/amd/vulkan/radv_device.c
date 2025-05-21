@@ -1001,8 +1001,17 @@ radv_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCr
    device->pbb_allowed =
       device->physical_device->rad_info.gfx_level >= GFX9 && !(device->instance->debug_flags & RADV_DEBUG_NOBINNING);
 
-   device->mesh_fast_launch_2 = (device->instance->perftest_flags & RADV_PERFTEST_GS_FAST_LAUNCH_2) &&
-                                device->physical_device->rad_info.gfx_level >= GFX11;
+   /* GS_FAST_LAUNCH=2 mode is supposed to be used on GFX11 but it turns
+    * out it has severe impact on performance for unknown reasons (tested on
+    * NAVI31 dGPU). It's disabled by default.
+    *
+    * On RDNA3 APUs (Phoenix) it turns GS_FAST_LAUNCH=1 doesn't work at all,
+    * and using mode2 fixes everything without any performance impact.
+    */
+   device->mesh_fast_launch_2 = ((device->instance->perftest_flags & RADV_PERFTEST_GS_FAST_LAUNCH_2) &&
+                                 device->physical_device->rad_info.gfx_level >= GFX11) ||
+                                device->physical_device->rad_info.family == CHIP_GFX1103_R1 ||
+                                device->physical_device->rad_info.family == CHIP_GFX1103_R2;
 
    device->disable_trunc_coord = device->instance->drirc.disable_trunc_coord;
 
@@ -1239,6 +1248,12 @@ radv_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCr
       device->capture_replay_arena_vas = _mesa_hash_table_u64_create(NULL);
    }
 
+   if (device->physical_device->rad_info.gfx_level == GFX11 && device->physical_device->rad_info.has_dedicated_vram &&
+       device->instance->drirc.force_pstate_peak_gfx11_dgpu) {
+      if (!radv_device_acquire_performance_counters(device))
+         fprintf(stderr, "radv: failed to set pstate to profile_peak.\n");
+   }
+
    *pDevice = radv_device_to_handle(device);
    return VK_SUCCESS;
 
@@ -1305,9 +1320,6 @@ radv_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
    if (!device)
       return;
 
-   if (device->capture_replay_arena_vas)
-      _mesa_hash_table_u64_destroy(device->capture_replay_arena_vas);
-
    radv_device_finish_perf_counter_lock_cs(device);
    if (device->perf_counter_bo)
       device->ws->buffer_destroy(device->ws, device->perf_counter_bo);
@@ -1357,6 +1369,8 @@ radv_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
    radv_finish_trace(device);
 
    radv_destroy_shader_arenas(device);
+   if (device->capture_replay_arena_vas)
+      _mesa_hash_table_u64_destroy(device->capture_replay_arena_vas);
 
    radv_sqtt_finish(device);
 
@@ -1763,7 +1777,7 @@ radv_initialise_color_surface(struct radv_device *device, struct radv_color_buff
        *
        * We set the pitch in MIP0_WIDTH.
        */
-      if (device->physical_device->rad_info.gfx_level && iview->image->vk.image_type == VK_IMAGE_TYPE_2D &&
+      if (device->physical_device->rad_info.gfx_level >= GFX10_3 && iview->image->vk.image_type == VK_IMAGE_TYPE_2D &&
           iview->image->vk.array_layers == 1 && plane->surface.is_linear) {
          assert((plane->surface.u.gfx9.surf_pitch * plane->surface.bpe) % 256 == 0);
 

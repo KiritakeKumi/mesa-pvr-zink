@@ -417,7 +417,9 @@ blorp_exec_on_compute(struct blorp_batch *batch,
 
    blorp_exec(batch, params);
 
+   cmd_buffer->state.descriptors_dirty |= VK_SHADER_STAGE_COMPUTE_BIT;
    cmd_buffer->state.push_constants_dirty |= VK_SHADER_STAGE_COMPUTE_BIT;
+   cmd_buffer->state.compute.pipeline_dirty = true;
 }
 
 static void
@@ -427,7 +429,7 @@ blorp_exec_on_blitter(struct blorp_batch *batch,
    assert(batch->flags & BLORP_BATCH_USE_BLITTER);
 
    struct anv_cmd_buffer *cmd_buffer = batch->driver_batch;
-   assert(cmd_buffer->queue_family->queueFlags == VK_QUEUE_TRANSFER_BIT);
+   assert(anv_cmd_buffer_is_blitter_queue(cmd_buffer));
 
    blorp_exec(batch, params);
 }
