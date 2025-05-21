@@ -58,7 +58,7 @@ else
   EGL_PLATFORMS += wayland
 
   GALLIUM_DRIVERS += nouveau r300 r600 virgl pvr
-  confflags_GALLIUM += -Dgallium-pvr-alias=es_drm
+  confflags_GALLIUM += -Dgallium-pvr-alias=vs_drm
   confflags_DIRECT_RENDERING = -Dglx-direct=true
   confflags_DRI3 = -Ddri3=enabled
   confflags_GBM = -Dgbm=enabled
