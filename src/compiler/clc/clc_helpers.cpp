@@ -1087,9 +1087,13 @@ clc_c_to_spir(const struct clc_compile_args *args,
 {
    clc_initialize_llvm();
 
-   LLVMContext llvm_ctx;
-   llvm_ctx.setDiagnosticHandlerCallBack(llvm_log_handler,
-                                         const_cast<clc_logger *>(logger));
+LLVMContext llvm_ctx;
+llvm_ctx.setDiagnosticHandlerCallBack(
+    +[](const llvm::DiagnosticInfo *DI, void *ctx) {
+        llvm_log_handler(*DI, ctx);
+    },
+    const_cast<clc_logger *>(logger)
+);
 
    auto mod = clc_compile_to_llvm_module(llvm_ctx, args, logger);
    if (!mod)
@@ -1113,9 +1117,13 @@ clc_c_to_spirv(const struct clc_compile_args *args,
 {
    clc_initialize_llvm();
 
-   LLVMContext llvm_ctx;
-   llvm_ctx.setDiagnosticHandlerCallBack(llvm_log_handler,
-                                         const_cast<clc_logger *>(logger));
+LLVMContext llvm_ctx;
+llvm_ctx.setDiagnosticHandlerCallBack(
+    +[](const llvm::DiagnosticInfo *DI, void *ctx) {
+        llvm_log_handler(*DI, ctx);
+    },
+    const_cast<clc_logger *>(logger)
+);
 
    auto mod = clc_compile_to_llvm_module(llvm_ctx, args, logger);
    if (!mod)
@@ -1130,9 +1138,13 @@ clc_spir_to_spirv(const struct clc_binary *in_spir,
 {
    clc_initialize_llvm();
 
-   LLVMContext llvm_ctx;
-   llvm_ctx.setDiagnosticHandlerCallBack(llvm_log_handler,
-                                         const_cast<clc_logger *>(logger));
+LLVMContext llvm_ctx;
+llvm_ctx.setDiagnosticHandlerCallBack(
+    +[](const llvm::DiagnosticInfo *DI, void *ctx) {
+        llvm_log_handler(*DI, ctx);
+    },
+    const_cast<clc_logger *>(logger)
+);
 
    ::llvm::StringRef spir_ref(static_cast<const char*>(in_spir->data), in_spir->size);
    auto mod = ::llvm::parseBitcodeFile(::llvm::MemoryBufferRef(spir_ref, "<spir>"), llvm_ctx);
